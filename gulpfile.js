@@ -1,64 +1,89 @@
-const {src, dest, watch, parallel, series} = require('gulp');
+let gulp = require('gulp'),
+    sass = require('gulp-sass'),
+    browserSync = require('browser-sync'),
+    uglify = require('gulp-uglify'),
+    concat = require('gulp-concat'),
+    rename = require('gulp-rename'),
+    del = require('del'),
+    autoprefixer = require('gulp-autoprefixer');
 
-const scss   = require('gulp-sass')(require('sass'));
-const concat = require('gulp-concat');
-const uglify = require('gulp-uglify-es').default; 
-const browserSync = require('browser-sync').create();
-const autoprefixer = require('gulp-autoprefixer');
-const clean = require('gulp-clean');
 
+gulp.task('clean', async function(){
+  del.sync('dist')
+})
 
-function scripts() {
-  return src([
-    'app/js/main.js',
+gulp.task('scss', function(){
+  return gulp.src('app/scss/**/*.scss')
+    .pipe(sass({outputStyle: 'compressed'}))
+    .pipe(autoprefixer({
+      browsers: ['last 8 versions']
+    }))
+    .pipe(rename({suffix: '.min'}))
+    .pipe(gulp.dest('app/css'))
+    .pipe(browserSync.reload({stream: true}))
+});
+
+gulp.task('css', function(){
+  return gulp.src([
+    'node_modules/normalize.css/normalize.css',
+    'node_modules/slick-carousel/slick/slick.css',
   ])
-    .pipe(concat('main.min.js'))
+    .pipe(concat('_libs.scss'))
+    .pipe(gulp.dest('app/scss'))
+    .pipe(browserSync.reload({stream: true}))
+});
+
+gulp.task('html', function(){
+  return gulp.src('app/*.html')
+  .pipe(browserSync.reload({stream: true}))
+});
+
+gulp.task('script', function(){
+  return gulp.src('app/js/*.js')
+  .pipe(browserSync.reload({stream: true}))
+});
+
+gulp.task('js', function(){
+  return gulp.src([
+    'node_modules/slick-carousel/slick/slick.js'
+  ])
+    .pipe(concat('libs.min.js'))
     .pipe(uglify())
-    .pipe(dest('app/js'))
-    .pipe(browserSync.stream())
-}
+    .pipe(gulp.dest('app/js'))
+    .pipe(browserSync.reload({stream: true}))
+});
 
-function styles() {
-  return src('app/scss/style.scss')
-    .pipe(autoprefixer({ overrideBrowserslist: ['last 10 version']}))
-    .pipe(concat('style.min.css'))
-    .pipe(scss({ outputStyle: 'compressed' }))
-    .pipe(dest('app/css'))
-    .pipe(browserSync.stream())
-}
-
-function watching() {
-  watch(['app/scss/style.scss'], styles)
-  watch(['app/js/main.js'], scripts)
-  watch(['app/*.html']).on('change', browserSync.reload);
-}
-
-function browsersync() {
+gulp.task('browser-sync', function() {
   browserSync.init({
-    server: {
-      baseDir: "app/"
-    }
+      server: {
+          baseDir: "app/"
+      }
   });
-}
+});
 
-function cleanDist() {
-  return src('dist')
-    .pipe(clean())
-}
+gulp.task('export', function(){
+  let buildHtml = gulp.src('app/**/*.html')
+    .pipe(gulp.dest('dist'));
 
-function building() {
-  return src([
-    'app/css/style.min.css',
-    'app/js/main.min.js',
-    'app/**/*.html'
-  ], {base : 'app'})
-    .pipe(dest('dist'))
-}
+  let BuildCss = gulp.src('app/css/**/*.css')
+    .pipe(gulp.dest('dist/css'));
 
-exports.styles = styles;
-exports.scripts = scripts;
-exports.watching = watching;
-exports.browsersync = browsersync;
+  let BuildJs = gulp.src('app/js/**/*.js')
+    .pipe(gulp.dest('dist/js'));
+    
+  let BuildFonts = gulp.src('app/fonts/**/*.*')
+    .pipe(gulp.dest('dist/fonts'));
 
-exports.build = series(cleanDist, building);
-exports.default = parallel(styles, scripts, browsersync, watching);
+  let BuildImg = gulp.src('app/img/**/*.*')
+    .pipe(gulp.dest('dist/img'));   
+});
+
+gulp.task('watch', function(){
+  gulp.watch('app/scss/**/*.scss', gulp.parallel('scss'));
+  gulp.watch('app/*.html', gulp.parallel('html'))
+  gulp.watch('app/js/*.js', gulp.parallel('script'))
+});
+
+gulp.task('build', gulp.series('clean', 'export'))
+
+gulp.task('default', gulp.parallel('css' ,'scss', 'js', 'browser-sync', 'watch'));
